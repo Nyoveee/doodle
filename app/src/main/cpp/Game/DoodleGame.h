@@ -27,7 +27,10 @@ public:
     // Doodle Game assumes that there is always one valid player, if not it segfaults.
     // if you want error handling, change it to pointer.
     Player& getPlayer();
-
+public:
+    void SpawnPlatform(float yPosition);
+    bool IsPlayerTouchingPlatform();
+    void PlayerJump();
 private:
     // unique pointer for polymorphism.
     std::vector<std::unique_ptr<GameObject>> gameObjects;
@@ -40,6 +43,13 @@ private:
 
     // reference to engine.
     Engine& engine;
+
+    // Game Stuff
+    float currentHeight;
+    float gravity;
+    float jumpVelocity;
+    float distanceBetweenPlatforms;
+
 };
 
 

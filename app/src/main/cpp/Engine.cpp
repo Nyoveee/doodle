@@ -1,12 +1,53 @@
 #include "Engine.h"
 
-#include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <GLES3/gl3.h>
 #include <memory>
 #include <vector>
 #include <android/imagedecoder.h>
 
 #include "AndroidUtils/AndroidOut.h"
+
+Engine::Engine(android_app *pApp) :
+        app_        (pApp),
+        renderer    (*this, pApp),
+        game        (*this, renderer.camera)
+{
+    // Initialize the Sensor Manager and poll source
+    sensorPollSource.id = LOOPER_ID_USER;
+    sensorPollSource.app = pApp;
+    sensorPollSource.process = Callback_OnSensorEvent;
+    sensorManager = ASensorManager_getInstance();
+    if(!sensorManager){
+        aout<< "Unable to get Sensor Manager";
+        return;
+    }
+    sensorEventQueue = ASensorManager_createEventQueue(sensorManager, pApp->looper,
+            LOOPER_ID_USER, NULL, &sensorPollSource);
+    // Intialize the Accelerometer
+    accelerometer = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
+    if(!accelerometer){
+        aout<< "Unable to get Accelerometer";
+        return;
+    }
+    if(ASensorEventQueue_enableSensor(sensorEventQueue,accelerometer) < 0){
+        aout << "Unable to enable Accelerometer";
+        return;
+    }
+    int32_t minDelay = ASensor_getMinDelay(accelerometer);
+    if(ASensorEventQueue_setEventRate(sensorEventQueue,accelerometer,minDelay) < 0){
+        aout << "Unable to set Accelerometer Rate";
+        return;
+    }
+}
+
+Engine::~Engine() {
+    // Free the Accelerometer
+    if(accelerometer){
+        ASensorEventQueue_disableSensor(sensorEventQueue, accelerometer);
+        accelerometer = nullptr;
+    }
+}
+
 
 void Engine::render() {
     renderer.render();
@@ -60,7 +101,6 @@ void Engine::handleInput() {
                 aout << "(" << pointer.id << ", " << x << ", " << y << ") "
                      << "Pointer Up";
                 break;
-
             case AMOTION_EVENT_ACTION_MOVE:
                 // There is no pointer index for ACTION_MOVE, only a snapshot of
                 // all active pointers; app needs to cache previous active pointers
@@ -104,7 +144,20 @@ void Engine::handleInput() {
         }
         aout << std::endl;
     }
-
     // clear the key input count too.
     android_app_clear_key_events(inputBuffer);
 }
+
+void Engine::Callback_OnSensorEvent(android_app *pApp, android_poll_source *pSource) {
+    Engine& engine{*(Engine*)pApp->userData};
+    engine.OnSensorEvent();
+}
+
+void Engine::OnSensorEvent() {
+    ASensorEvent event;
+    while(ASensorEventQueue_getEvents(sensorEventQueue,&event,1) > 0)
+        if(event.type == ASENSOR_TYPE_ACCELEROMETER)
+            acceleration = glm::vec3{event.acceleration.x,event.acceleration.y, event.acceleration.z};
+}
+
+glm::vec3 Engine::GetAccelerometerAcceleration() const { return acceleration; }

@@ -27,6 +27,7 @@ public:
     virtual ~GameObject() = 0;
 
 public:
+    glm::vec2 velocity;
     glm::vec2 position;
     glm::vec2 scale;
     float rotation;

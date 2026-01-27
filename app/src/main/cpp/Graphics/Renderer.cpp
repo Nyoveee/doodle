@@ -195,7 +195,9 @@ GLuint Renderer::getTextureId(std::string const& filepath) {
         return NO_TEXTURE;
     }
 }
-
+glm::vec2 Renderer::getScreenDimensions(){
+    return {static_cast<float>(width_),static_cast<float>(height_)};
+}
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);

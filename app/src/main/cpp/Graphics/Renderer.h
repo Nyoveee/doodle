@@ -16,6 +16,7 @@ struct android_app;
 #include "Camera.h"
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 
 class Engine;
 class GameObject;
@@ -40,6 +41,8 @@ public:
     void render();
 
     GLuint getTextureId(std::string const& filepath);
+    glm::vec2 getScreenDimensions();
+
 
 public:
     Camera camera;
