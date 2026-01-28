@@ -41,8 +41,6 @@ public:
     void render();
 
     GLuint getTextureId(std::string const& filepath);
-    glm::vec2 getScreenDimensions();
-
 
 public:
     Camera camera;
@@ -59,7 +57,6 @@ private:
      * update the viewport accordingly
      */
     void updateRenderArea();
-
     // calculate the given model matrix for a game object.
     static glm::mat4 calculateModelMatrix(GameObject const& gameObject);
 

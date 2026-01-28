@@ -106,7 +106,7 @@ void Renderer::initRenderer() {
 
     // initialise camera..
     camera.position = {0, 0};
-    camera.scale = {width_, height_};
+    updateRenderArea();
 
     // initialise none texture..
     auto assetManager = app_->activity->assetManager;
@@ -195,9 +195,6 @@ GLuint Renderer::getTextureId(std::string const& filepath) {
         return NO_TEXTURE;
     }
 }
-glm::vec2 Renderer::getScreenDimensions(){
-    return {static_cast<float>(width_),static_cast<float>(height_)};
-}
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -213,3 +210,4 @@ Renderer::~Renderer() {
         display_ = EGL_NO_DISPLAY;
     }
 }
+

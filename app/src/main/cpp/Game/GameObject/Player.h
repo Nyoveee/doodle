@@ -13,7 +13,9 @@ public:
     Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier);
     Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier, GLuint textureId);
 public:
-    float movementAcceleration{1000};
+    glm::vec2 velocity{};
+    float movementAcceleration{500};
+    float jumpVelocity{1500};
 };
 
 

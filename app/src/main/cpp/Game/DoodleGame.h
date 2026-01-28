@@ -29,7 +29,8 @@ public:
     Player& getPlayer();
 public:
     void SpawnPlatform(float yPosition);
-    bool IsPlayerTouchingPlatform();
+    bool IsPlayerTouchingPlatform(GameObject const& platform);
+    bool SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax);
     void PlayerJump();
 private:
     // unique pointer for polymorphism.
@@ -45,9 +46,8 @@ private:
     Engine& engine;
 
     // Game Stuff
-    float currentHeight;
+    float nextPlatformSpawn;
     float gravity;
-    float jumpVelocity;
     float distanceBetweenPlatforms;
 
 };

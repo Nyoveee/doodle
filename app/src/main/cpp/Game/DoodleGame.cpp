@@ -13,14 +13,19 @@
 DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         engine { engine },
         camera { camera },
-        gravity{980}
+        gravity{2000},
+        nextPlatformSpawn{400}, // Start with some offset
+        distanceBetweenPlatforms{200}
 {
     // create player..
     playerIndex = static_cast<int>(gameObjects.size());
-
     gameObjects.push_back(std::make_unique<Player>(
-            glm::vec2{0, 0}, glm::vec2{ 200, 200 }, engine.getTextureId("android_robot.png")
+            glm::vec2{0,-camera.scale.y/2.f + 100},
+            glm::vec2{ 200, 200 },
+            engine.getTextureId("android_robot.png")
     ));
+    PlayerJump();
+    nextPlatformSpawn += gameObjects[playerIndex]->position.y;
 }
 
 Player& DoodleGame::getPlayer() {
@@ -30,19 +35,46 @@ Player& DoodleGame::getPlayer() {
 
 void DoodleGame::update(float deltaTime) {
     Player &player{getPlayer()};
-
+    float gameWidth{camera.scale.x};
+    float gameHeight{camera.scale.y};
     // Update Player Velocity and Position
     player.velocity.x += deltaTime * -engine.GetAccelerometerAcceleration().x * player.movementAcceleration;
-    //player.velocity.y += deltaTime * -gravity;
+    player.velocity.y += deltaTime * -gravity;
     player.position += deltaTime * player.velocity;
-    float gameWidth{engine.renderer.getScreenDimensions().x};
-    float min = -gameWidth/2 + player.scale.x/2;
-    float max = gameWidth/2 - player.scale.x/2;
-    player.position.x = std::clamp(player.position.x, min, max);
-
+    float playerScreenXmin = -gameWidth/2.f + player.scale.x/2.f;
+    float playerScreenXmax = gameWidth/2.f - player.scale.x/2.f;
+    player.position.x = std::clamp(player.position.x, playerScreenXmin, playerScreenXmax);
     // Stops the player from moving at the edge
-    if(player.position.x == min || player.position.x == max)
+    if(player.position.x == playerScreenXmin || player.position.x == playerScreenXmax)
         player.velocity.x = 0;
+    // Jump
+    for(int i{}; i < gameObjects.size();++i){
+        if(i == playerIndex)
+            continue;
+        GameObject& platform{*gameObjects[i]};
+        if(IsPlayerTouchingPlatform(platform)){
+            PlayerJump();
+            break;
+        }
+    }
+    // Increase Camera Height
+    if(player.position.y > camera.position.y)
+        camera.position.y = player.position.y;
+    // Platform despawning
+    auto canDespawnPlatform = [&](std::unique_ptr<GameObject> const& go){
+        if(&go == &gameObjects[playerIndex])
+            return false;
+        float platformMaxY = go->position.y + go->scale.y/2;
+        return platformMaxY < camera.position.y - gameHeight/2;
+    };
+    std::vector<std::unique_ptr<GameObject>>::iterator iter
+        = std::remove_if(std::begin(gameObjects), std::end(gameObjects),canDespawnPlatform);
+    if(iter!= gameObjects.end())
+        gameObjects.erase(iter, gameObjects.end());
+
+    // Platform spawning
+    for(nextPlatformSpawn; nextPlatformSpawn < camera.position.y + gameHeight/2; nextPlatformSpawn += distanceBetweenPlatforms)
+        SpawnPlatform(nextPlatformSpawn);
 }
 
 std::vector<std::unique_ptr<GameObject>> const& DoodleGame::getGameObjects() {
@@ -50,16 +82,31 @@ std::vector<std::unique_ptr<GameObject>> const& DoodleGame::getGameObjects() {
 }
 
 void DoodleGame::SpawnPlatform(float yPosition) {
-    float gameWidth{engine.renderer.getScreenDimensions().x};
-    gameObjects.push_back(std::make_unique<Platform>(
-            glm::vec2{rand() * gameWidth - gameWidth/2, yPosition}, glm::vec2{ 220, 50 }
-    ));
+    float gameWidth{camera.scale.x};
+    glm::vec2 platformScale = glm::vec2{ 150, 30 };
+    float randomX = rand() % static_cast<int>(gameWidth- platformScale.x) - gameWidth/2 + platformScale.x/2;
+    gameObjects.push_back(std::make_unique<Platform>(glm::vec2{randomX, yPosition},platformScale));
 }
 
-bool DoodleGame::IsPlayerTouchingPlatform() {
-    return false;
+bool DoodleGame::IsPlayerTouchingPlatform(GameObject const& platform) {
+    Player &player{getPlayer()};
+    if(player.velocity.y >= 0)
+        return false;
+    glm::vec2 playerMin{player.position - player.scale/2.f};
+    glm::vec2 playerMax{player.position + player.scale/2.f};
+    glm::vec2 platformMin{platform.position - platform.scale/2.f};
+    glm::vec2 platformMax{platform.position + platform.scale/2.f};
+    return SimpleAABB(playerMin,playerMax,platformMin,platformMax);
+}
+bool DoodleGame::SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax){
+    if(aMin.x > bMax.x || aMin.y > bMax.y)
+        return false;
+    if(aMax.x < bMin.x || aMax.y < bMin.y)
+        return false;
+    return true;
 }
 
 void DoodleGame::PlayerJump() {
-    getPlayer().velocity.y = jumpVelocity;
+    Player &player{getPlayer()};
+    player.velocity.y = player.jumpVelocity;
 }
