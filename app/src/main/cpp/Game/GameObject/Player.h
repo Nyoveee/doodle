@@ -13,9 +13,15 @@ public:
     Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier);
     Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier, GLuint textureId);
 public:
+    const float maxRotationTime{0.5f};
+    const int rotationChance{60}; // out of 100
+    const float maxMovementSpeed{2000};
+    const float movementAcceleration{750};
+    const float jumpVelocity{1750};
+
+    float currentRotationTime{0};
+    glm::vec2 prevPos{};
     glm::vec2 velocity{};
-    float movementAcceleration{500};
-    float jumpVelocity{1500};
 };
 
 

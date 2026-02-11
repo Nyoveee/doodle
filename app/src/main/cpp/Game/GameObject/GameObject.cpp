@@ -4,7 +4,7 @@
 
 #include "GameObject.h"
 
-GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, GLuint textureId) :
+GameObject::GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, GLuint textureId) :
     position        { position },
     scale           { scale },
     rotation        { 0.f },
@@ -13,7 +13,7 @@ GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, GLuint te
     textureId       { textureId }
 {}
 
-GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4 colorMultiplier) :
+GameObject::GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, glm::vec4 colorMultiplier) :
         position        { position },
         scale           { scale },
         rotation        { 0.f },
@@ -22,7 +22,7 @@ GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4
         textureId       { NO_TEXTURE }
 {}
 
-GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4 colorMultiplier, GLuint textureId) :
+GameObject::GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, glm::vec4 colorMultiplier, GLuint textureId) :
         position        { position },
         scale           { scale },
         rotation        { 0.f },
@@ -30,6 +30,10 @@ GameObject::GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4
         colorMultiplier { colorMultiplier },
         textureId       { textureId }
 {}
+
+GameObjectType GameObject::getType() {
+    return type;
+}
 
 // Compulsory virtual destructor definition,
 // even if it's empty

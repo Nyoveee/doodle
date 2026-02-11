@@ -142,19 +142,9 @@ void Renderer::render() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Render all game objects.
-    for(auto& gameObjectPtr : engine.game.getGameObjects()) {
-        GameObject& gameObject = *gameObjectPtr;
-
-        // Setup the texture
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gameObject.textureId != NO_TEXTURE ? gameObject.textureId : noneTexture->getTextureID());
-
-        mainShader->setMatrix("model", calculateModelMatrix(gameObject));
-        mainShader->setVec4("colorMultiplier", gameObject.colorMultiplier);
-
-        // VBO-less draw.
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    }
+    renderLayer(static_cast<int>(GameObjectType::Environment));
+    renderLayer(static_cast<int>(GameObjectType::Platform));
+    renderLayer(static_cast<int>(GameObjectType::Player));
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -208,6 +198,23 @@ Renderer::~Renderer() {
         }
         eglTerminate(display_);
         display_ = EGL_NO_DISPLAY;
+    }
+}
+
+void Renderer::renderLayer(int type) {
+    for(auto& gameObjectPtr : engine.game.getGameObjects()) {
+        GameObject& gameObject = *gameObjectPtr;
+        if(static_cast<int>(gameObject.getType()) != type)
+            continue;
+        // Setup the texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gameObject.textureId != NO_TEXTURE ? gameObject.textureId : noneTexture->getTextureID());
+
+        mainShader->setMatrix("model", calculateModelMatrix(gameObject));
+        mainShader->setVec4("colorMultiplier", gameObject.colorMultiplier);
+
+        // VBO-less draw.
+        glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 }
 

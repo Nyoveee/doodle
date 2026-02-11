@@ -12,20 +12,22 @@
 using GLuint = unsigned int;
 constexpr inline static GLuint NO_TEXTURE = std::numeric_limits<GLuint>::max();
 
-enum class Type {
+enum class GameObjectType {
     Player,
-    Platform
+    Platform,
+    Environment
 };
 
 // abstract class..
 class GameObject {
 public:
-    GameObject(glm::vec2 position, glm::vec2 scale, Type type, GLuint textureId);
-    GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4 colorMultiplier);
-    GameObject(glm::vec2 position, glm::vec2 scale, Type type, glm::vec4 colorMultiplier, GLuint textureId);
+    GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, GLuint textureId);
+    GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, glm::vec4 colorMultiplier);
+    GameObject(glm::vec2 position, glm::vec2 scale, GameObjectType type, glm::vec4 colorMultiplier, GLuint textureId);
 
     virtual ~GameObject() = 0;
 
+    GameObjectType getType();
 public:
     glm::vec2 position;
     glm::vec2 scale;
@@ -34,7 +36,7 @@ public:
 
     GLuint textureId;
 private:
-    Type type;
+    GameObjectType type;
 };
 
 #endif //DOODLE_GAMEOBJECT_H

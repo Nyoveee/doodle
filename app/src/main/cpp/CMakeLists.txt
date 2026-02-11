@@ -23,6 +23,7 @@ add_library(doodle SHARED
         Game/GameObject/GameObject.cpp
         Game/GameObject/Player.cpp
         Game/GameObject/Platform.cpp
+        Game/GameObject/Background.cpp
 )
 
 # Searches for a package provided by the game activity dependency

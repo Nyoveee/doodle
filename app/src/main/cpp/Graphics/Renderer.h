@@ -20,7 +20,6 @@ struct android_app;
 
 class Engine;
 class GameObject;
-
 class Renderer {
 public:
     explicit Renderer(Engine& engine, android_app *pApp) :
@@ -39,7 +38,7 @@ public:
 
 public:
     void render();
-
+    void renderLayer(int type);
     GLuint getTextureId(std::string const& filepath);
 
 public:

@@ -5,13 +5,13 @@
 #include "Player.h"
 
 Player::Player(glm::vec2 position, glm::vec2 scale, GLuint textureId) :
-    GameObject { position, scale, Type::Player, textureId }
+    GameObject {position, scale, GameObjectType::Player, textureId }
 {}
 
 Player::Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier) :
-    GameObject { position, scale, Type::Platform, colorMultiplier }
+    GameObject {position, scale, GameObjectType::Player, colorMultiplier }
 {}
 
 Player::Player(glm::vec2 position, glm::vec2 scale, glm::vec4 colorMultiplier, GLuint textureId) :
-    GameObject { position, scale, Type::Platform, colorMultiplier, textureId }
+    GameObject {position, scale, GameObjectType::Player, colorMultiplier, textureId }
 {}
