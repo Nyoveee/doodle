@@ -5,10 +5,13 @@
 #ifndef DOODLE_RENDERER_H
 #define DOODLE_RENDERER_H
 
-struct android_app;
-
 #include <EGL/egl.h>
 #include <numeric>
+#include <android/asset_manager.h>
+#include <vector>
+#include <unordered_map>
+#include <memory>
+#include <mutex>
 
 #include "Model.h"
 #include "Shader.h"
@@ -18,22 +21,15 @@ struct android_app;
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 
+// Forward decl
+struct ANativeWindow;
+
 class Engine;
 class GameObject;
+
 class Renderer {
 public:
-    explicit Renderer(Engine& engine, android_app *pApp) :
-            engine(engine),
-            app_(pApp),
-            display_(EGL_NO_DISPLAY),
-            surface_(EGL_NO_SURFACE),
-            context_(EGL_NO_CONTEXT),
-            width_(0),
-            height_(0),
-            shaderNeedsNewProjectionMatrix_(true){
-        initRenderer();
-    }
-
+    explicit Renderer(Engine& engine);
     ~Renderer();
 
 public:
@@ -41,27 +37,29 @@ public:
     void renderLayer(int type);
     GLuint getTextureId(std::string const& filepath);
 
+    // Manage window and EGL context on the render thread
+    void setWindow(ANativeWindow* window);
+    void setAssetManager(AAssetManager* assetManager) { assetManager_ = assetManager; }
+
+    // EGL management needs to protect resources and only touch GL from render thread
+    void initEGL();
+    void terminateEGL();
+    bool isReady() const { return context_ != EGL_NO_CONTEXT; }
+
 public:
     Camera camera;
 
 private:
-    /*!
-     * Performs necessary OpenGL initialization. Customize this if you want to change your EGL
-     * context or application-wide settings.
-     */
-    void initRenderer();
-
-    /*!
-     * @brief we have to check every frame to see if the framebuffer has changed in size. If it has,
-     * update the viewport accordingly
-     */
     void updateRenderArea();
-    // calculate the given model matrix for a game object.
     static glm::mat4 calculateModelMatrix(GameObject const& gameObject);
 
 private:
     Engine& engine;
-    android_app *app_;
+
+    // Thread safety for window changes
+    std::mutex windowMutex_;
+    ANativeWindow* window_ = nullptr;
+
     EGLDisplay display_;
     EGLSurface surface_;
     EGLContext context_;
@@ -71,13 +69,12 @@ private:
     bool shaderNeedsNewProjectionMatrix_;
 
     std::unique_ptr<Shader> mainShader;
+    std::shared_ptr<TextureAsset> noneTexture;
+    std::vector<std::shared_ptr<TextureAsset>> textures;
+    std::unordered_map<std::string, GLuint> textureFilepathToId;
 
-    // owns all the texture.
-    std::shared_ptr<TextureAsset> noneTexture;                      // none texture is a 1x1 white texture.
-    std::vector<std::shared_ptr<TextureAsset>> textures;            // owns all the textures
-
-    std::unordered_map<std::string, GLuint> textureFilepathToId;    // maps all filepath to the corresponding texture id.. (NOT INDEX)
-                                                                    // we can do this because we are not unloading our textures..
+    // We need asset manager access now without android_app
+    AAssetManager* assetManager_ = nullptr;
 };
 
 

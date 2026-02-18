@@ -7,15 +7,21 @@
 
 #include <vector>
 #include <memory>
-#include "GameObject/GameObject.h"
+#include "GameObject/Player.h"
+#include "GameObject/Platform.h"
+#include "GameObject/Background.h"
 
+// Forward decl
 class Camera;
-class Player;
 class Engine;
-class Background;
 
 class DoodleGame {
 public:
+    // Decoupled constructor: doesn't need full engine init immediately for texture loading?
+    // Actually, texture ID loading needs initialized GL context.
+    // So DoodleGame creation must happen *after* EGL init.
+    // Passing Engine& is fine, but we must ensure we don't call GL methods in constructor
+    // OR we defer initialization.
     explicit DoodleGame(Engine& engine, Camera& camera);
 
 public:
@@ -25,8 +31,6 @@ public:
     std::vector<std::unique_ptr<GameObject>> const& getGameObjects();
 
     // get player..
-    // Doodle Game assumes that there is always one valid player, if not it segfaults.
-    // if you want error handling, change it to pointer.
     Player& getPlayer();
     Background& getCurrentBackground();
 public:
@@ -34,6 +38,10 @@ public:
     bool IsPlayerTouchingPlatform(GameObject const& platform);
     bool SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax);
     void PlayerJump();
+
+    // Helper to init game objects once GL is ready
+    void init();
+
 private:
     const glm::vec2 platformScale = glm::vec2{ 175, 20 };
     // unique pointer for polymorphism.
@@ -51,8 +59,8 @@ private:
     float nextPlatformSpawn;
     float gravity;
     float distanceBetweenPlatforms;
+    bool isInitialized = false;
 
 };
-
 
 #endif //DOODLE_DOODLEGAME_H

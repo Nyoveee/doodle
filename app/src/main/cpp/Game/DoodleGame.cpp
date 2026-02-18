@@ -4,28 +4,33 @@
 
 #include "DoodleGame.h"
 #include "../Graphics/Camera.h"
-
-#include "GameObject/Player.h"
-#include "GameObject/Platform.h"
-#include "GameObject/Background.h"
-#include "Utils.h"
 #include "../Engine.h"
+#include "Utils.h"
+#include <algorithm> // for std::remove_if
 
 DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         engine { engine },
         camera { camera },
         gravity{2000},
         nextPlatformSpawn{400}, // Start with some offset
-        distanceBetweenPlatforms{150}
+        distanceBetweenPlatforms{150},
+        isInitialized{false}
 {
+    // Constructor no longer calls GL methods.
+}
+
+void DoodleGame::init() {
+    if (isInitialized) return;
+
     // create player..
     playerIndex = static_cast<int>(gameObjects.size());
+    // Texture IDs need active GL context
     gameObjects.push_back(std::make_unique<Player>(
             glm::vec2{0,-camera.scale.y/2.f + 120},
             glm::vec2{ 150, 150 },
             engine.getTextureId("Player.png")
     ));
-    getPlayer().prevPos = getPlayer().position;
+
     // Create Background
     backgroundIndex = static_cast<int>(gameObjects.size());
     gameObjects.push_back(std::make_unique<Background>(
@@ -33,26 +38,47 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
             glm::vec2{camera.scale.x,camera.scale.y * 3.f},
             engine.getTextureId("Scrolling Background.png")
     ));
+
     // Starting Platform
     SpawnPlatform(0, -camera.scale.y/2.f);
-    (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
-    nextPlatformSpawn += gameObjects[playerIndex]->position.y;
+    if (!gameObjects.empty()) {
+       (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
+    }
+
     PlayerJump();
 
+    isInitialized = true;
 }
 
 Player& DoodleGame::getPlayer() {
-    // the player must be valid.
+    // Safety check?
+    if (gameObjects.empty()) {
+        // Fallback or crash
+        init(); // Attempt just in case
+    }
     return *dynamic_cast<Player*>(gameObjects[playerIndex].get());
 }
 
+Background& DoodleGame::getCurrentBackground() {
+    if (gameObjects.empty()) init();
+    return *dynamic_cast<Background*>(gameObjects[backgroundIndex].get());
+}
+
 void DoodleGame::update(float deltaTime) {
+    if (!isInitialized) {
+        init(); // Try to init if context is ready now?
+        if (!isInitialized) return; // If engine texture loading fails, returns NO_TEXTURE, so it won't crash here ideally
+    }
+
     Player &player{getPlayer()};
     float gameWidth{camera.scale.x};
     float gameHeight{camera.scale.y};
 
     // Update Player Velocity and Position
-    player.velocity.x += deltaTime * -engine.GetAccelerometerAcceleration().x * player.movementAcceleration;
+    // player.velocity.x += deltaTime * -engine.GetAccelerometerAcceleration().x * player.movementAcceleration;
+    // Sensor disabled for now
+    player.velocity.x += 0;
+
     player.velocity.x = std::clamp(player.velocity.x, -player.maxMovementSpeed, player.maxMovementSpeed);
     player.velocity.y += deltaTime * -gravity;
     player.position += deltaTime * player.velocity;
@@ -104,17 +130,15 @@ void DoodleGame::update(float deltaTime) {
 
     // Platform spawning
     for(nextPlatformSpawn; nextPlatformSpawn < camera.position.y + gameHeight/2; nextPlatformSpawn += distanceBetweenPlatforms){
-        float randomX = rand() % static_cast<int>(gameWidth- platformScale.x) - gameWidth/2 + platformScale.x/2;
+        float randomX = rand() % static_cast<int>(gameWidth - platformScale.x) - gameWidth/2 + platformScale.x/2;
         SpawnPlatform(randomX, nextPlatformSpawn);
     }
-
 
     // Scrolling Background
     Background& background = getCurrentBackground();
     if(background.position.y <= camera.position.y - camera.scale.y/2.f){
         background.position.y += camera.scale.y;
     }
-
 }
 
 std::vector<std::unique_ptr<GameObject>> const& DoodleGame::getGameObjects() {
@@ -122,14 +146,10 @@ std::vector<std::unique_ptr<GameObject>> const& DoodleGame::getGameObjects() {
 }
 
 void DoodleGame::SpawnPlatform(float xPosition, float yPosition) {
+    if (!isInitialized) return;
     const std::string platformPath[] = {
-         "Platform 1.png",
-         "Platform 2.png",
-         "Platform 3.png",
-         "Platform 4.png",
-         "Platform 5.png"
+         "Platform 1.png", "Platform 2.png", "Platform 3.png", "Platform 4.png", "Platform 5.png"
     };
-    float gameWidth{camera.scale.x};
     gameObjects.push_back(std::make_unique<Platform>(
             glm::vec2{xPosition, yPosition},
             platformScale,
@@ -147,23 +167,17 @@ bool DoodleGame::IsPlayerTouchingPlatform(GameObject const& platform) {
     return (player.prevPos.y - player.scale.y/2.f) > platformMax.y
         && SimpleAABB(playerMin,playerMax,platformMin,platformMax);
 }
+
 bool DoodleGame::SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax){
-    if(aMin.x > bMax.x || aMin.y > bMax.y)
-        return false;
-    if(aMax.x < bMin.x || aMax.y < bMin.y)
-        return false;
+    if(aMin.x > bMax.x || aMin.y > bMax.y) return false;
+    if(aMax.x < bMin.x || aMax.y < bMin.y) return false;
     return true;
 }
 
 void DoodleGame::PlayerJump() {
-    Player &player{getPlayer()};
+     Player &player{getPlayer()};
     player.velocity.y = player.jumpVelocity;
-    // Everytime we jump, roll a 101 dice[0-100]
     int roll = rand() % 101;
     if(roll <= player.rotationChance)
         player.currentRotationTime = player.maxRotationTime;
-}
-
-Background& DoodleGame::getCurrentBackground() {
-    return *dynamic_cast<Background*>(gameObjects[backgroundIndex].get());
 }

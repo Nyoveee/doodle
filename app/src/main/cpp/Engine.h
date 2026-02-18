@@ -8,9 +8,18 @@
 #include "Game/DoodleGame.h"
 #include "Graphics/Renderer.h"
 
+#include <mutex>
+#include <vector>
+
 using GLuint = unsigned int;
 
 struct android_app;
+
+struct TouchEvent {
+    int32_t action;
+    float x;
+    float y;
+};
 
 class Engine {
 public:
@@ -27,6 +36,8 @@ public:
      */
     void handleInput();
 
+    void pushTouchEvent(int32_t action, float x, float y);
+
     /*!
      * Renders all the models in the renderer
      */
@@ -40,7 +51,7 @@ public:
     GLuint getTextureId(std::string const& filepath);
 
     // Data from Gyroscope
-    glm::vec3 GetAccelerometerAcceleration() const;
+    [[nodiscard]] glm::vec3 GetAccelerometerAcceleration() const;
 private:
     static void Callback_OnSensorEvent(android_app* pApp,android_poll_source* pSource);
     void OnSensorEvent();
@@ -51,6 +62,10 @@ public:
     DoodleGame game;                // holds all the game objects and are in charge of their logic.
 
 private:
+    // Input
+    std::mutex inputMutex_;
+    std::vector<TouchEvent> touchEvents_;
+
     // Sensor Variables
     ASensorManager* sensorManager;
     ASensorEventQueue* sensorEventQueue;

@@ -9,6 +9,7 @@ project("doodle")
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
 add_library(doodle SHARED
         main.cpp
+        JNI_Bridge.cpp
         AndroidUtils/AndroidOut.cpp
         Engine.cpp
 

@@ -6,6 +6,9 @@
 #include "AndroidUtils/AndroidOut.h"
 #include "Engine.h"
 
+// Global pointer to the current Engine instance so JNI bridge can access it safely.
+Engine* g_engine = nullptr;
+
 extern "C" {
 
 /*!
@@ -21,6 +24,7 @@ void handle_cmd(android_app *pApp, int32_t cmd) {
             // if you change the class here as a reinterpret_cast is dangerous this in the
             // android_main function and the APP_CMD_TERM_WINDOW handler case.
             pApp->userData = new Engine(pApp);
+            g_engine = reinterpret_cast<Engine *>(pApp->userData);
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being destroyed. Use this to clean up your userData to avoid leaking
@@ -32,6 +36,7 @@ void handle_cmd(android_app *pApp, int32_t cmd) {
                 auto *pEngine = reinterpret_cast<Engine *>(pApp->userData);
                 pApp->userData = nullptr;
                 delete pEngine;
+                g_engine = nullptr;
             }
             break;
         default:
@@ -83,7 +88,7 @@ void android_main(struct android_app *pApp) {
             int events;
             android_poll_source *pSource;
             int result = ALooper_pollOnce(timeout, nullptr, &events,
-                                          reinterpret_cast<void**>(&pSource));
+                                          reinterpret_cast<void **>(&pSource));
             switch (result) {
                 case ALOOPER_POLL_TIMEOUT:
                     [[clang::fallthrough]];
@@ -98,7 +103,7 @@ void android_main(struct android_app *pApp) {
                     break;
                 default:
                     if (pSource) {
-                       pSource->process(pApp, pSource);
+                        pSource->process(pApp, pSource);
                     }
             }
         }

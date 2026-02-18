@@ -7,7 +7,7 @@
 #include "../AndroidUtils/AndroidOut.h"
 #include "../Engine.h"
 
-#include <game-activity/native_app_glue/android_native_app_glue.h>
+#include <android/native_window.h>
 #include <GLES3/gl3.h>
 #include <memory>
 #include <vector>
@@ -16,7 +16,29 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-void Renderer::initRenderer() {
+// Constructor / Destructor
+Renderer::Renderer(Engine& engine) :
+        engine(engine),
+        window_(nullptr),
+        display_(EGL_NO_DISPLAY),
+        surface_(EGL_NO_SURFACE),
+        context_(EGL_NO_CONTEXT),
+        width_(0),
+        height_(0),
+        shaderNeedsNewProjectionMatrix_(true),
+        assetManager_(nullptr) {
+}
+
+Renderer::~Renderer() {
+    // Ensure EGL and window are cleaned up
+    terminateEGL();
+    if (window_) {
+        ANativeWindow_release(window_);
+        window_ = nullptr;
+    }
+}
+
+void Renderer::initEGL() {
     // Choose your render attributes
     constexpr EGLint attribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
@@ -41,8 +63,6 @@ void Renderer::initRenderer() {
     eglChooseConfig(display, attribs, supportedConfigs.get(), numConfigs, &numConfigs);
 
     // Find a config we like.
-    // Could likely just grab the first if we don't care about anything else in the config.
-    // Otherwise hook in your own heuristic
     auto config = *std::find_if(
             supportedConfigs.get(),
             supportedConfigs.get() + numConfigs,
@@ -66,7 +86,14 @@ void Renderer::initRenderer() {
     // create the proper window surface
     EGLint format;
     eglGetConfigAttrib(display, config, EGL_NATIVE_VISUAL_ID, &format);
-    EGLSurface surface = eglCreateWindowSurface(display, config, app_->window, nullptr);
+
+    // Use the stored window_ pointer (set from JNI). If not present, fail init.
+    if (!window_) {
+        aout << "initEGL called but no window_ available" << std::endl;
+        return;
+    }
+
+    EGLSurface surface = eglCreateWindowSurface(display, config, window_, nullptr);
 
     // Create a GLES 3 context
     EGLint contextAttribs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
@@ -89,31 +116,38 @@ void Renderer::initRenderer() {
     PRINT_GL_STRING(GL_VERSION);
     PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
 
-    mainShader = std::unique_ptr<Shader>(
-            Shader::loadShader("main.vert", "main.frag", app_->activity->assetManager));
-    assert(mainShader);
+    // Load shader and textures using assetManager_ (passed from JNI). If not set, skip and log a warning.
+    if (assetManager_) {
+        mainShader = std::unique_ptr<Shader>(
+                Shader::loadShader("main.vert", "main.frag", assetManager_));
+        assert(mainShader);
 
-    // Note: there's only one shader in this demo, so I'll activate it here. For a more complex game
-    // you'll want to track the active shader and activate/deactivate it as necessary
-    mainShader->activate();
+        // Note: activating shader can remain, but guard against null
+        if (mainShader) mainShader->activate();
 
-    // setup any other gl related global states
-    glClearColor(CORNFLOWER_BLUE);
+        // setup any other gl related global states
+        glClearColor(CORNFLOWER_BLUE);
 
-    // enable alpha globally for now, you probably don't want to do this in a game
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // enable alpha globally for now
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // initialise camera..
-    camera.position = {0, 0};
-    updateRenderArea();
+        // initialise camera..
+        camera.position = {0, 0};
+        updateRenderArea();
 
-    // initialise none texture..
-    auto assetManager = app_->activity->assetManager;
-    noneTexture = TextureAsset::loadAsset(assetManager, "None.png");
+        // initialise none texture..
+        noneTexture = TextureAsset::loadAsset(assetManager_, "None.png");
+    } else {
+        aout << "Warning: assetManager_ not set; skipping shader/texture load" << std::endl;
+        // still set GL states so we present a clear color
+        glClearColor(CORNFLOWER_BLUE);
+    }
 }
 
 void Renderer::updateRenderArea() {
+    if (display_ == EGL_NO_DISPLAY || surface_ == EGL_NO_SURFACE) return;
+
     EGLint width;
     eglQuerySurface(display_, surface_, EGL_WIDTH, &width);
 
@@ -129,12 +163,25 @@ void Renderer::updateRenderArea() {
 }
 
 void Renderer::render() {
-    // Check to see if the surface has changed size. This is _necessary_ to do every frame when
-    // using immersive mode as you'll get no other notification that your renderable area has
-    // changed.
+    // If no EGL context yet, attempt to lazily init on this render thread
+    if (context_ == EGL_NO_CONTEXT) {
+        initEGL();
+    }
+
+    if (context_ == EGL_NO_CONTEXT) return; // nothing to do
+
     updateRenderArea();
 
-    // get camera's projection matrix.. (camera will always be moving, no point lazy calculating it..)
+    // If shader not loaded, draw clear color only
+    if (!mainShader || !noneTexture) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        if (display_ != EGL_NO_DISPLAY && surface_ != EGL_NO_SURFACE) {
+            eglSwapBuffers(display_, surface_);
+        }
+        return;
+    }
+
+    // get camera's projection matrix
     mainShader->setMatrix("viewProjection", camera.getViewProjection()) ;
     mainShader->setImageUniform("uTexture", 0);
 
@@ -171,8 +218,11 @@ GLuint Renderer::getTextureId(std::string const& filepath) {
     }
 
     // Not loaded, let's attempt to load it.
-    auto assetManager = app_->activity->assetManager;
-    auto texture = TextureAsset::loadAsset(assetManager, filepath);
+    if (!assetManager_) {
+        aout << "No AssetManager available to load texture: " << filepath << std::endl;
+        return NO_TEXTURE;
+    }
+    auto texture = TextureAsset::loadAsset(assetManager_, filepath);
 
     // loading successful..
     if(texture) {
@@ -185,7 +235,8 @@ GLuint Renderer::getTextureId(std::string const& filepath) {
         return NO_TEXTURE;
     }
 }
-Renderer::~Renderer() {
+
+void Renderer::terminateEGL() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         if (context_ != EGL_NO_CONTEXT) {
@@ -199,6 +250,23 @@ Renderer::~Renderer() {
         eglTerminate(display_);
         display_ = EGL_NO_DISPLAY;
     }
+}
+
+void Renderer::setWindow(ANativeWindow* window) {
+    std::lock_guard<std::mutex> lock(windowMutex_);
+
+    // If there's an existing window, release it and teardown EGL
+    if (window_ && window_ != window) {
+        // tear down GLES resources tied to previous window
+        terminateEGL();
+        ANativeWindow_release(window_);
+        window_ = nullptr;
+    }
+
+    // adopt the new window (caller often passed a reference from ANativeWindow_fromSurface)
+    window_ = window;
+
+    // EGL initialization is deferred to render() (render thread) which will call initEGL/create context
 }
 
 void Renderer::renderLayer(int type) {
@@ -217,4 +285,3 @@ void Renderer::renderLayer(int type) {
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 }
-
