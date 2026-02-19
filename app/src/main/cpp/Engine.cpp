@@ -55,6 +55,7 @@ void Engine::render() {
 
 void Engine::update(float deltaTime) {
     game.update(deltaTime);
+    LOGI("Updated Game Loop");
 }
 
 GLuint Engine::getTextureId(std::string const& filepath) {
