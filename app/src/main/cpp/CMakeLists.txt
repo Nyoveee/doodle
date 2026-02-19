@@ -11,6 +11,7 @@ add_library(doodle SHARED
         main.cpp
         AndroidUtils/AndroidOut.cpp
         Engine.cpp
+        JNI_Bridge.cpp
 
         # Graphics..
         Graphics/Shader.cpp

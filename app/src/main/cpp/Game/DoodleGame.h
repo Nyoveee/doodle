@@ -20,6 +20,7 @@ public:
 
 public:
     void update(float deltaTime);
+    void updateUI(float deltaTime);
 
     // retrieve all game objects..
     std::vector<std::unique_ptr<GameObject>> const& getGameObjects();
@@ -34,7 +35,18 @@ public:
     bool IsPlayerTouchingPlatform(GameObject const& platform);
     bool SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax);
     void PlayerJump();
+    void InitPlay();
+    void PlayTime(float deltaTime);
+    void ResetGame();
+public:
+    enum class GameState{
+        Start,
+        Playing,
+        GameOver
+    };
+
 private:
+
     const glm::vec2 platformScale = glm::vec2{ 175, 20 };
     // unique pointer for polymorphism.
     std::vector<std::unique_ptr<GameObject>> gameObjects;
@@ -43,6 +55,8 @@ private:
     int backgroundIndex;
     // reference to renderer's camera.
     Camera& camera;
+    glm::vec2 cameraPos;
+
 
     // reference to engine.
     Engine& engine;
@@ -51,6 +65,13 @@ private:
     float nextPlatformSpawn;
     float gravity;
     float distanceBetweenPlatforms;
+    bool  isGameOver;
+
+    GameState gameState;
+
+    //UI Tracking
+    float score;
+    glm::vec2 basePos;
 
 };
 
