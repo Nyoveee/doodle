@@ -64,6 +64,7 @@ private:
     Engine& engine;
 
     // Game Stuff
+    float initDelay;
     float nextPlatformSpawn;
     float gravity;
     float distanceBetweenPlatforms;
