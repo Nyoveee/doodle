@@ -1,3 +1,5 @@
+#pragma once
+
 #include <jni.h>
 
 #include <game-activity/native_app_glue/android_native_app_glue.h>
@@ -5,6 +7,11 @@
 
 #include "AndroidUtils/AndroidOut.h"
 #include "Engine.h"
+
+// 1. Add global pointer at the top, this is used to call functions on the engine from JNI.
+// You can replace this with a more robust solution if you want,
+// but this is the simplest way to get JNI working.
+Engine* g_Engine = nullptr;
 
 extern "C" {
 
@@ -21,6 +28,7 @@ void handle_cmd(android_app *pApp, int32_t cmd) {
             // if you change the class here as a reinterpret_cast is dangerous this in the
             // android_main function and the APP_CMD_TERM_WINDOW handler case.
             pApp->userData = new Engine(pApp);
+            g_Engine = reinterpret_cast<Engine*>(pApp->userData);
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being destroyed. Use this to clean up your userData to avoid leaking
@@ -31,7 +39,9 @@ void handle_cmd(android_app *pApp, int32_t cmd) {
                 //
                 auto *pEngine = reinterpret_cast<Engine *>(pApp->userData);
                 pApp->userData = nullptr;
+                g_Engine = nullptr;
                 delete pEngine;
+
             }
             break;
         default:

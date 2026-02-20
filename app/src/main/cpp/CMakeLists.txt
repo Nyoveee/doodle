@@ -12,6 +12,7 @@ add_library(doodle SHARED
         AndroidUtils/AndroidOut.cpp
         Engine.cpp
         AudioManager.cpp
+        JNI_Bridge.cpp
 
         # Graphics..
         Graphics/Shader.cpp

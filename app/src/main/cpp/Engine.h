@@ -4,10 +4,14 @@
 #include <memory>
 #include <android/sensor.h>
 #include <game-activity/native_app_glue/android_native_app_glue.h>
-
+#include <android/log.h>
 #include "Game/DoodleGame.h"
 #include "Graphics/Renderer.h"
 #include "AudioManager.h"
+
+#define LOG_TAG "DoodleEngine" // This is the 'Tag' you will search for in Logcat
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 using GLuint = unsigned int;
 

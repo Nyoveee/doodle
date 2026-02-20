@@ -172,16 +172,19 @@ GLuint Renderer::getTextureId(std::string const& filepath) {
 
     // Not loaded, let's attempt to load it.
     auto assetManager = app_->activity->assetManager;
-    auto texture = TextureAsset::loadAsset(assetManager, filepath);
+    std::shared_ptr<TextureAsset> texture = TextureAsset::loadAsset(assetManager, filepath);
 
     // loading successful..
     if(texture) {
         GLuint textureId = texture->getTextureID();
         textures.push_back(std::move(texture)); // move ownership to from local variable to renderer
+        LOGI("Texture Loaded %d, for file path %s", textureId, filepath.c_str());
+        textureFilepathToId[filepath] = textureId;
         return textureId;
     }
     else {
         aout << "Failed to load texture: " << filepath << std::endl;
+        LOGE("Failed to load texture: %s", filepath.c_str());
         return NO_TEXTURE;
     }
 }
