@@ -5,7 +5,6 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -42,12 +40,25 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
+import androidx.lifecycle.lifecycleScope
+import com.example.doodle.data.GameDatabase
+import com.example.doodle.data.HighScoreDao
+import com.example.doodle.data.HighScoreEntity
 import com.google.androidgamesdk.GameActivity
-import kotlin.times
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import java.util.UUID
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.core.content.edit
 
 
 //Match game activity states with screen states.
@@ -62,14 +73,20 @@ enum class ScreenState {
 
 class MainActivity : GameActivity() {
 
+    private lateinit var dao: HighScoreDao
+    private val topScores = mutableStateOf<List<HighScoreEntity>>(emptyList())
+
+    private val showUsernameDialog = mutableStateOf(false)
+    private val pendingScore = mutableIntStateOf(0) // holds score while dialog is open
+
     // We use a mutable state defined outside onCreate so the JNI method can access the setter logic indirectly
     private val currentScore = mutableIntStateOf(0)
     private val currentScreen = mutableStateOf(ScreenState.START_MENU)
 
     // Theme Colors derived from your screenshot
-    private val ThemeRed = Color(0xFFD32F2F) // Red for platforms/buttons
-    private val ThemeBlack = Color.Black
-    private val ThemeWhite = Color.White
+    private val themeRed = Color(0xFFD32F2F) // Red for platforms/buttons
+    private val themeBlack = Color.Black
+    private val themeWhite = Color.White
 
     companion object {
         init {
@@ -89,6 +106,12 @@ class MainActivity : GameActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        dao = GameDatabase.getInstance(this).highScoreDao()
+
+        lifecycleScope.launch {
+            dao.getTopScores().collect { topScores.value = it }
+        }
 
         // 1. Create a ComposeView manually
         val composeView = ComposeView(this).apply {
@@ -136,7 +159,65 @@ class MainActivity : GameActivity() {
     fun gameOver(finalScore: Int) {
         runOnUiThread {
             currentScore.intValue = finalScore
-            currentScreen.value = ScreenState.GAME_OVER
+            pendingScore.intValue = finalScore
+
+            if (getSavedUsername() == null) {
+                // First time — ask for name before saving
+                showUsernameDialog.value = true
+                currentScreen.value = ScreenState.GAME_OVER
+            } else {
+                // Already have a name — save score directly
+                currentScreen.value = ScreenState.GAME_OVER
+                persistScore(finalScore, getSavedUsername()!!)
+            }
+        }
+    }
+
+    // Extracted so both paths can call it
+    private fun persistScore(finalScore: Int, username: String) {
+        val userId = getOrCreateUserId()
+        lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            val existing = dao.getPlayerScore(userId).firstOrNull()
+            if (existing == null) {
+                dao.upsert(HighScoreEntity(
+                    userId = userId,
+                    gameId = UUID.randomUUID().toString(),
+                    username = username,
+                    highScore = finalScore,
+                    gamesPlayed = 1,
+                    achievedAt = now,
+                    lastPlayedAt = now
+                ))
+            } else {
+                val isNewRecord = finalScore > existing.highScore
+                dao.upsert(existing.copy(
+                    gameId = if (isNewRecord) UUID.randomUUID().toString() else existing.gameId,
+                    highScore = maxOf(existing.highScore, finalScore),
+                    gamesPlayed = existing.gamesPlayed + 1,
+                    achievedAt = if (isNewRecord) now else existing.achievedAt,
+                    lastPlayedAt = now
+                ))
+            }
+        }
+    }
+
+
+    // Generates and persists a stable userId per device install
+    private fun getOrCreateUserId(): String {
+        val prefs = getSharedPreferences("game_prefs", MODE_PRIVATE)
+        return prefs.getString("user_id", null) ?: UUID.randomUUID().toString().also { id ->
+            prefs.edit { putString("user_id", id) }
+        }
+    }
+
+    // Reads saved username, null if first time
+    private fun getSavedUsername(): String? =
+        getSharedPreferences("game_prefs", MODE_PRIVATE).getString("username", null)
+
+    private fun saveUsername(name: String) {
+        getSharedPreferences("game_prefs", MODE_PRIVATE).edit {
+            putString("username", name)
         }
     }
 
@@ -151,7 +232,7 @@ class MainActivity : GameActivity() {
         startGameNative()
     }
 
-    public fun backToMenu() {
+    fun backToMenu() {
         currentScreen.value = ScreenState.START_MENU
     }
 
@@ -162,12 +243,12 @@ class MainActivity : GameActivity() {
 
     external fun restartGameNative()
 
-    public fun restartGame() {
+    fun restartGame() {
         // 2. Reset UI State
         currentScore.intValue = 0
         currentScreen.value = ScreenState.PLAYING
         // 3. Call C++
-        restartGameNative();
+        restartGameNative()
     }
 
 
@@ -196,7 +277,7 @@ class MainActivity : GameActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ThemeBlack), // Match game background
+                .background(themeBlack), // Match game background
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -213,7 +294,7 @@ class MainActivity : GameActivity() {
                         // Title
                         Text(
                             text = "Demon Jump", // Or "DOODLE JUMP"
-                            color = ThemeRed,
+                            color = themeRed,
                             fontSize = 50.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -255,14 +336,14 @@ class MainActivity : GameActivity() {
                         Button(
                             onClick = { finish() },
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            border = BorderStroke(2.dp, ThemeRed),
+                            border = BorderStroke(2.dp, themeRed),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.width(220.dp).height(60.dp)
                         ) {
                             Text(
                                 "QUIT",
                                 fontSize = 20.sp,
-                                color = ThemeRed,
+                                color = themeRed,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
@@ -276,7 +357,7 @@ class MainActivity : GameActivity() {
     fun MenuButton(text: String, onClick: () -> Unit) {
         Button(
             onClick = onClick,
-            colors = ButtonDefaults.buttonColors(containerColor = ThemeRed), // Red platforms
+            colors = ButtonDefaults.buttonColors(containerColor = themeRed), // Red platforms
             shape = RoundedCornerShape(8.dp), // Slightly blocky like platforms
             modifier = Modifier
                 .width(220.dp)
@@ -286,7 +367,7 @@ class MainActivity : GameActivity() {
                 text = text,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = ThemeWhite,
+                color = themeWhite,
                 fontFamily = FontFamily.Monospace
             )
         }
@@ -294,80 +375,69 @@ class MainActivity : GameActivity() {
 
     @Composable
     fun HighScoresOverlay() {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(ThemeBlack) // Full screen black background
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 1. Large Top Bar
+        val scores = topScores.value
+
+        Box(modifier = Modifier.fillMaxSize().background(themeBlack)) {
+            Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(ThemeRed) // Red header bar
-                        .padding(vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth().background(themeRed).padding(vertical = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "HIGH SCORES",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ThemeWhite,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 4.sp
-                    )
+                    Text("HIGH SCORES", fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                        color = themeWhite, fontFamily = FontFamily.Monospace, letterSpacing = 4.sp)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Scrollable Lazy Window
-                // weights (1f) ensure it takes up all available space between header and footer
                 LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 32.dp),
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Dummy data for display purposes
-                    items(20) { index ->
+                    if (scores.isEmpty()) {
+                        item {
+                            Text(
+                                "No scores yet — get climbing!",
+                                color = Color.Gray,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(32.dp)
+                            )
+                        }
+                    }
+
+                    itemsIndexed(scores) { index, score ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .background(Color(0xFF1A1A1A), RoundedCornerShape(4.dp)) // Dark gray item bg
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(vertical = 8.dp)
+                                .background(Color(0xFF1A1A1A), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Player ${index + 1}",
-                                color = Color.White,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 18.sp
-                            )
-                            Text(
-                                text = "${(20 - index) * 100}", // Descending dummy scores
-                                color = ThemeRed,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
+                            Text("#${index + 1}", color = Color.Gray,
+                                fontFamily = FontFamily.Monospace, fontSize = 14.sp)
+                            Text(score.username, color = Color.White,
+                                fontFamily = FontFamily.Monospace, fontSize = 18.sp)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("${score.highScore}", color = themeRed,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("${score.gamesPlayed} games", color = Color.Gray,
+                                    fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // 3. Close Button at the bottom
                 MenuButton(text = "CLOSE", onClick = { backToMenu() })
-
-                Spacer(modifier = Modifier.height(32.dp)) // Bottom padding
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
+
 
     @Composable
     fun InGameOverlay() {
@@ -391,41 +461,108 @@ class MainActivity : GameActivity() {
     }
 
     @Composable
+    fun UsernameDialog(onConfirm: (String) -> Unit) {
+        var text by remember { mutableStateOf("") }
+        val isValid = text.trim().length in 2..16
+
+        AlertDialog(
+            onDismissRequest = { /* force them to enter a name, no dismiss */ },
+            containerColor = Color(0xFF1A1A1A),
+            title = {
+                Text(
+                    "Enter Your Name",
+                    color = themeWhite,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "This will appear on the leaderboard.",
+                        color = Color.Gray,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { if (it.length <= 16) text = it },
+                        placeholder = { Text("e.g. DemonSlayer", color = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = themeRed,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedTextColor = themeWhite,
+                            unfocusedTextColor = themeWhite,
+                            cursorColor = themeRed
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done,
+                            capitalization = KeyboardCapitalization.Words
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { if (isValid) onConfirm(text.trim()) }
+                        )
+                    )
+                    if (text.isNotEmpty() && !isValid) {
+                        Text(
+                            "Name must be 2–16 characters.",
+                            color = themeRed,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { if (isValid) onConfirm(text.trim()) },
+                    enabled = isValid,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = themeRed,
+                        disabledContainerColor = Color(0xFF7A1A1A)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("SAVE", fontFamily = FontFamily.Monospace, color = themeWhite)
+                }
+            }
+        )
+    }
+
+
+    @Composable
     fun GameOverOverlay() {
+
+        // Show username dialog on top if needed
+        if (showUsernameDialog.value) {
+            UsernameDialog(onConfirm = { name ->
+                saveUsername(name)
+                showUsernameDialog.value = false
+                persistScore(pendingScore.intValue, name)
+            })
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xEE000000)) // Mostly opaque black
+                .background(Color(0xEE000000))
                 .clickable(enabled = false) {},
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "GAME OVER",
-                    fontSize = 48.sp,
-                    color = ThemeRed,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-
+                Text("GAME OVER", fontSize = 48.sp, color = themeRed,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 Spacer(modifier = Modifier.height(16.dp))
-
                 Text("FINAL SCORE", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
-                Text(
-                    text = "${currentScore.intValue}",
-                    color = ThemeWhite,
-                    fontSize = 60.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-
+                Text("${currentScore.intValue}", color = themeWhite, fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 Spacer(modifier = Modifier.height(40.dp))
-
                 MenuButton(text = "RETRY", onClick = { restartGame() })
-
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // Hollow Style for "Menu"
                 Button(
                     onClick = { backToMenu() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
