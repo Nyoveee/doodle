@@ -109,6 +109,13 @@ void android_main(struct android_app *pApp) {
             // user data remember to change it here
             auto *pEngine = reinterpret_cast<Engine *>(pApp->userData);
 
+            static bool audioBool = false;
+            if(!audioBool){
+                pEngine->playAudio("BGM.mp3", true);
+                audioBool = true;
+            }
+
+
             // Process game input
             pEngine->handleInput();
 

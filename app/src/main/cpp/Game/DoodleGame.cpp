@@ -38,7 +38,7 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
     (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
     nextPlatformSpawn += gameObjects[playerIndex]->position.y;
     PlayerJump();
-
+    
 }
 
 Player& DoodleGame::getPlayer() {

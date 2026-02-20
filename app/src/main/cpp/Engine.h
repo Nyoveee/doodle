@@ -7,6 +7,7 @@
 
 #include "Game/DoodleGame.h"
 #include "Graphics/Renderer.h"
+#include "AudioManager.h"
 
 using GLuint = unsigned int;
 
@@ -49,7 +50,8 @@ public:
     android_app *app_;              // reference to the original android app.
     Renderer renderer;              // responsible for graphics
     DoodleGame game;                // holds all the game objects and are in charge of their logic.
-
+    AudioManager getAudioManager();
+    void playAudio(const char* path, bool loopBool);
 private:
     // Sensor Variables
     ASensorManager* sensorManager;
@@ -57,6 +59,7 @@ private:
     android_poll_source sensorPollSource;
     const ASensor* accelerometer;
     glm::vec3 acceleration;
+    AudioManager audioManager;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

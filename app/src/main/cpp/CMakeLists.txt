@@ -11,6 +11,7 @@ add_library(doodle SHARED
         main.cpp
         AndroidUtils/AndroidOut.cpp
         Engine.cpp
+        AudioManager.cpp
 
         # Graphics..
         Graphics/Shader.cpp
@@ -44,7 +45,8 @@ target_link_libraries(doodle
         GLESv3
         jnigraphics
         android
-        log)
+        log
+        openSLES)
 
 # include external libraries.. like glm..
 target_include_directories(doodle PRIVATE

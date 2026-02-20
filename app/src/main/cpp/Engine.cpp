@@ -10,7 +10,8 @@
 Engine::Engine(android_app *pApp) :
         app_        (pApp),
         renderer    (*this, pApp),
-        game        (*this, renderer.camera)
+        game        (*this, renderer.camera),
+        audioManager (pApp)
 {
     // Initialize the Sensor Manager and poll source
     sensorPollSource.id = LOOPER_ID_USER;
@@ -37,6 +38,10 @@ Engine::Engine(android_app *pApp) :
     if(ASensorEventQueue_setEventRate(sensorEventQueue,accelerometer,minDelay) < 0){
         aout << "Unable to set Accelerometer Rate";
         return;
+    }
+
+    if(audioManager.start() == STATUS_KO){
+        aout << "Failed to start audioManager";
     }
 }
 
@@ -161,3 +166,11 @@ void Engine::OnSensorEvent() {
 }
 
 glm::vec3 Engine::GetAccelerometerAcceleration() const { return acceleration; }
+
+AudioManager Engine::getAudioManager() {
+    return audioManager;
+}
+
+void Engine::playAudio(const char *path, bool loopBool) {
+    audioManager.playBGM(path, loopBool);
+}
