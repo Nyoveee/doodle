@@ -16,38 +16,11 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         engine { engine },
         camera { camera },
         gravity{2000},
+        initDelay{1.f},
         nextPlatformSpawn{400}, // Start with some offset
         distanceBetweenPlatforms{150}
 {
-//    // create player..
-//    playerIndex = static_cast<int>(gameObjects.size());
-//    gameObjects.push_back(std::make_unique<Player>(
-//            glm::vec2{0,-camera.scale.y/2.f + 120},
-//            glm::vec2{ 150, 150 },
-//            engine.getTextureId("Player.png")
-//    ));
-//    getPlayer().prevPos = getPlayer().position;
-//    // Create Background
-//    backgroundIndex = static_cast<int>(gameObjects.size());
-//    gameObjects.push_back(std::make_unique<Background>(
-//            glm::vec2{0,0},
-//            glm::vec2{camera.scale.x,camera.scale.y * 3.f},
-//            engine.getTextureId("Scrolling Background.png")
-//    ));
-//    // Starting Platform
-//    SpawnPlatform(0, -camera.scale.y/2.f);
-//    (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
-//    nextPlatformSpawn += gameObjects[playerIndex]->position.y;
-//    PlayerJump();
-//
-//    isGameOver = false;
-//    //UI init
-//    score = 0;
-//    basePos = getPlayer().position;
-
       gameState = GameState::Start;
-
-
 }
 
 Player& DoodleGame::getPlayer() {
@@ -56,8 +29,11 @@ Player& DoodleGame::getPlayer() {
 }
 
 void DoodleGame::update(float deltaTime) {
-
-
+    // Because the renderer needs some time to get the correct width/height of the screen
+    if(initDelay > 0) {
+        initDelay -= deltaTime;
+        return;
+    }
     switch (gameState) {
         case GameState::Start:
             InitPlay();
@@ -67,10 +43,7 @@ void DoodleGame::update(float deltaTime) {
             break;
         case GameState::GameOver:
             break;
-
     }
-
-
 }
 
 std::vector<std::unique_ptr<GameObject>> const& DoodleGame::getGameObjects() {
@@ -125,16 +98,19 @@ Background& DoodleGame::getCurrentBackground() {
 }
 
 void DoodleGame::updateUI(float deltaTime) {
+    if(gameState == GameState::Playing) {
+        //calculate top score
+        float currentHeight = (getPlayer().position.y - basePos.y) * 0.5f;
+        score = std::max(score, currentHeight);
 
-    //calculate top score
-    float currentHeight = (getPlayer().position.y - basePos.y) * 0.5f;
-    score = std::max(score, currentHeight);
-
-    JNI_UpdateScore(engine.app_, static_cast<int>(score));
+        JNI_UpdateScore(engine.app_, static_cast<int>(score));
+    }
 }
 
 void DoodleGame::InitPlay() {
-
+    gameObjects.clear();
+    nextPlatformSpawn = 400;
+    camera.position = glm::vec2{0,0};
     // create player..
     playerIndex = static_cast<int>(gameObjects.size());
     gameObjects.push_back(std::make_unique<Player>(
@@ -246,40 +222,5 @@ void DoodleGame::PlayTime(float deltaTime) {
 }
 
 void DoodleGame::ResetGame() {
-    //gameObjects.clear();
-    nextPlatformSpawn = 400;
-    //camera reset
-    glm::vec2 currentScale = camera.scale;
-    camera = Camera(); // Reset camera position and scale
-    camera.scale = currentScale;
-
-    //despawn all plaforms except the starting one
-    auto iter = std::remove_if(gameObjects.begin(), gameObjects.end(),
-                               [](const std::unique_ptr<GameObject>& go) {
-                                   return go->getType() == GameObjectType::Platform;
-                               });
-    gameObjects.erase(iter, gameObjects.end());
-
-    //reset player position and velocity
-    Player &player{getPlayer()};
-    player.position =  glm::vec2{0,-camera.scale.y/2.f};
-    getPlayer().prevPos = getPlayer().position;
-    player.velocity = glm::vec2{0,0};
-    player.rotation = 0;
-    PlayerJump();
-
-
-    //large plaform
-    gameObjects[backgroundIndex]->position = glm::vec2{0,0};
-
-    // Starting Platform
-    SpawnPlatform(0, -camera.scale.y/2.f);
-    (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
-    nextPlatformSpawn += gameObjects[playerIndex]->position.y;
-
-    isGameOver = false;
-    //UI init
-    score = 0;
-    basePos = getPlayer().position;
-    gameState = GameState::Playing;
+    gameState = GameState::Start;
 }
