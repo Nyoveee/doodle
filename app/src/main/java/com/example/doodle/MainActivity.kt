@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -31,11 +32,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.androidgamesdk.GameActivity
 
+//Match game activity states with screen states.
+enum class ScreenState {
+    START_MENU,
+    PLAYING,
+    GAME_OVER
+}
+
+
+
 class MainActivity : GameActivity() {
 
     // We use a mutable state defined outside onCreate so the JNI method can access the setter logic indirectly
     private val currentScore = mutableIntStateOf(0)
-    private val isGameOver = mutableStateOf(false)
+    private val currentScreen = mutableStateOf(ScreenState.START_MENU)
 
 
     companion object {
@@ -61,72 +71,13 @@ class MainActivity : GameActivity() {
         val composeView = ComposeView(this).apply {
             setContent {
 
-                Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Box(modifier = Modifier.fillMaxSize()) {
 
-                    //Text to display when in game
-                    if (!isGameOver.value) {
-                        // High Score Text
-                        Column(
-                            modifier = Modifier.align(Alignment.TopStart)
-                        ) {
-                            Text(
-                                text = "Score: ",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "${currentScore.intValue}",
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
-                    //on game over
-                    if(isGameOver.value)
-                    {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0xAA000000)) // Semi-transparent black
-                                .clickable(enabled = false) {}, // Block clicks passing through
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                    .padding(32.dp)
-                            ) {
-                                Text(
-                                    "GAME OVER",
-                                    color = Color.Red,
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("Final Score", color = Color.Black, fontSize = 18.sp)
-                                Text(
-                                    text = "${currentScore.intValue}",
-                                    color = Color.Black,
-                                    fontSize = 48.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Button(
-                                    onClick = {
-                                        // For now, just restart app or exit.
-                                        // Ideally you call a C++ function to reset game state.
-                                        restartGame()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
-                                ) {
-                                    Text("Restart Game")
-                                }
-                            }
-                        }
+                    // 3. Switch Content based on State
+                    when (currentScreen.value) {
+                        ScreenState.START_MENU -> StartMenuOverlay()
+                        ScreenState.PLAYING -> InGameOverlay()
+                        ScreenState.GAME_OVER -> GameOverOverlay()
                     }
                 }
 
@@ -161,16 +112,30 @@ class MainActivity : GameActivity() {
     fun gameOver(finalScore: Int) {
         runOnUiThread {
             currentScore.intValue = finalScore
-            isGameOver.value = true
+            currentScreen.value = ScreenState.GAME_OVER
         }
     }
 
     //---UI to Engine functions---
+
+    external fun startGameNative()
+
+    fun startGame() {
+        currentScore.intValue = 0
+        currentScreen.value = ScreenState.PLAYING
+        // We reuse the native restart function to reset the C++ state
+        startGameNative()
+    }
+
+    public fun backToMenu() {
+        currentScreen.value = ScreenState.START_MENU
+    }
+
+
     external fun restartGameNative()
 
-    private fun restartGame() {
+    public fun restartGame() {
         // 2. Reset UI State
-        isGameOver.value = false
         currentScore.intValue = 0
 
         // 3. Call C++
@@ -189,4 +154,109 @@ class MainActivity : GameActivity() {
                 or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_FULLSCREEN)
     }
+
+    @Composable
+    fun StartMenuOverlay() {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF87CEEB)) // Sky blue opaque background to hide game
+                .clickable(enabled = false) {},
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "DEMON MAN JUMP",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = {  startGame() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Text("PLAY GAME", fontSize = 20.sp, modifier = Modifier.padding(8.dp))
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun InGameOverlay() {
+        // Transparent overlay, just shows score
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Column(modifier = Modifier.align(Alignment.TopStart)) {
+                Text(
+                    text = "Score:",
+                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${currentScore.intValue}",
+                    color = Color.Black,
+                    fontSize = 24.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun GameOverOverlay() {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xAA000000)) // Semi-transparent black
+                .clickable(enabled = false) {}, // Block clicks
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .background(Color.White, shape = RoundedCornerShape(16.dp))
+                    .padding(32.dp)
+            ) {
+                Text(
+                    "GAME OVER",
+                    color = Color.Red,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Final Score", color = Color.Black, fontSize = 18.sp)
+                Text(
+                    text = "${currentScore.intValue}",
+                    color = Color.Black,
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Restart Button
+                Button(
+                    onClick = { startGame() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
+                ) {
+                    Text("Try Again")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Back to Menu Button
+                Button(
+                    onClick = { backToMenu() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Main Menu")
+                }
+            }
+        }
+    }
 }
+
+
+
+
+

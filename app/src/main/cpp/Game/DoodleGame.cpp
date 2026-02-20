@@ -17,7 +17,10 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         camera { camera },
         gravity{2000},
         nextPlatformSpawn{400}, // Start with some offset
-        distanceBetweenPlatforms{150}
+        distanceBetweenPlatforms{150},
+        hasGameRunOnce{false},
+        isGameOver{false},
+        gameState{GameState::Start}
 {
 //    // create player..
 //    playerIndex = static_cast<int>(gameObjects.size());
@@ -45,8 +48,6 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
 //    score = 0;
 //    basePos = getPlayer().position;
 
-      gameState = GameState::Start;
-
 
 }
 
@@ -60,7 +61,7 @@ void DoodleGame::update(float deltaTime) {
 
     switch (gameState) {
         case GameState::Start:
-            InitPlay();
+            //State controlled by UI currently
             break;
         case GameState::Playing:
             PlayTime(deltaTime);
@@ -126,12 +127,30 @@ Background& DoodleGame::getCurrentBackground() {
 
 void DoodleGame::updateUI(float deltaTime) {
 
-    //calculate top score
-    float currentHeight = (getPlayer().position.y - basePos.y) * 0.5f;
-    score = std::max(score, currentHeight);
+    //game loops keeps running, reference error if engine has not init on start screen.
+    if(gameState == GameState::Playing) {
+        //calculate top score
+        float currentHeight = (getPlayer().position.y - basePos.y) * 0.5f;
+        score = std::max(score, currentHeight);
 
-    JNI_UpdateScore(engine.app_, static_cast<int>(score));
+        JNI_UpdateScore(engine.app_, static_cast<int>(score));
+    }
 }
+
+
+void DoodleGame::StartGame() {
+    if(hasGameRunOnce)
+    {
+        ResetGame();
+    }
+    else
+    {
+        InitPlay();
+        hasGameRunOnce = true;
+    }
+
+}
+
 
 void DoodleGame::InitPlay() {
 
@@ -283,3 +302,5 @@ void DoodleGame::ResetGame() {
     basePos = getPlayer().position;
     gameState = GameState::Playing;
 }
+
+

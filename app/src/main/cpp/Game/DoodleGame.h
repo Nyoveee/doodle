@@ -35,9 +35,11 @@ public:
     bool IsPlayerTouchingPlatform(GameObject const& platform);
     bool SimpleAABB(glm::vec2 aMin, glm::vec2 aMax, glm::vec2 bMin, glm::vec2 bMax);
     void PlayerJump();
+    void StartGame();
     void InitPlay();
     void PlayTime(float deltaTime);
     void ResetGame();
+
 public:
     enum class GameState{
         Start,
@@ -66,6 +68,7 @@ private:
     float gravity;
     float distanceBetweenPlatforms;
     bool  isGameOver;
+    bool  hasGameRunOnce;
 
     GameState gameState;
 

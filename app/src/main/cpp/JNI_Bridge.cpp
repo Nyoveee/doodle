@@ -82,4 +82,13 @@ Java_com_example_doodle_MainActivity_restartGameNative(JNIEnv *env, jobject thiz
         g_Engine->game.ResetGame();
     }
 }
+
+JNIEXPORT void JNICALL
+Java_com_example_doodle_MainActivity_startGameNative(JNIEnv *env, jobject thiz) {
+    if (g_Engine) {
+    // Now this works because we included Engine.h and extern g_Engine
+    g_Engine->game.StartGame();
+    }
+}
+
 }
