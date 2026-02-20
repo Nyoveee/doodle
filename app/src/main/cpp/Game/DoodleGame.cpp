@@ -48,7 +48,9 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
 //    score = 0;
 //    basePos = getPlayer().position;
 
-
+    engine.getTextureId("Player.png");
+    engine.getTextureId("Scrolling Background.png");
+    engine.getTextureId("Platform 1.png");
 }
 
 Player& DoodleGame::getPlayer() {

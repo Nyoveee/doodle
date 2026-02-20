@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,13 +32,30 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import com.google.androidgamesdk.GameActivity
+import kotlin.times
+
 
 //Match game activity states with screen states.
 enum class ScreenState {
     START_MENU,
     PLAYING,
-    GAME_OVER
+    GAME_OVER,
+    HIGH_SCORES
 }
 
 
@@ -47,6 +66,10 @@ class MainActivity : GameActivity() {
     private val currentScore = mutableIntStateOf(0)
     private val currentScreen = mutableStateOf(ScreenState.START_MENU)
 
+    // Theme Colors derived from your screenshot
+    private val ThemeRed = Color(0xFFD32F2F) // Red for platforms/buttons
+    private val ThemeBlack = Color.Black
+    private val ThemeWhite = Color.White
 
     companion object {
         init {
@@ -78,6 +101,7 @@ class MainActivity : GameActivity() {
                         ScreenState.START_MENU -> StartMenuOverlay()
                         ScreenState.PLAYING -> InGameOverlay()
                         ScreenState.GAME_OVER -> GameOverOverlay()
+                        ScreenState.HIGH_SCORES -> HighScoresOverlay()
                     }
                 }
 
@@ -132,12 +156,16 @@ class MainActivity : GameActivity() {
     }
 
 
+    private fun openHighScores() {
+        currentScreen.value = ScreenState.HIGH_SCORES
+    }
+
     external fun restartGameNative()
 
     public fun restartGame() {
         // 2. Reset UI State
         currentScore.intValue = 0
-
+        currentScreen.value = ScreenState.PLAYING
         // 3. Call C++
         restartGameNative();
     }
@@ -157,27 +185,186 @@ class MainActivity : GameActivity() {
 
     @Composable
     fun StartMenuOverlay() {
+
+        var isVisible by remember { mutableStateOf(false) }
+
+        // Trigger the animation immediately when this Composable enters the screen
+        LaunchedEffect(Unit) {
+            isVisible = true
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF87CEEB)) // Sky blue opaque background to hide game
-                .clickable(enabled = false) {},
+                .background(ThemeBlack), // Match game background
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "DEMON MAN JUMP",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-                Button(
-                    onClick = {  startGame() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+
+                // Title Animation: Slides down from top
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { -100 }, // Start 100 pixels above
+                        animationSpec = tween(durationMillis = 800)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 800))
                 ) {
-                    Text("PLAY GAME", fontSize = 20.sp, modifier = Modifier.padding(8.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Title
+                        Text(
+                            text = "Demon Jump", // Or "DOODLE JUMP"
+                            color = ThemeRed,
+                            fontSize = 50.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Text(
+                            text = "SURVIVE THE CLIMB",
+                            color = Color.Gray,
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(bottom = 60.dp)
+                        )
+                    }
                 }
+
+
+
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { 200 }, // Start 200 pixels below
+                        animationSpec = tween(durationMillis = 800, delayMillis = 300) // 300ms delay for potential stagger effect
+                    ) + fadeIn(animationSpec = tween(durationMillis = 800, delayMillis = 300))
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // 1. Play Button
+                        MenuButton(text = "PLAY", onClick = { startGame() })
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // 2. High Scores Button
+                        MenuButton(text = "HIGH SCORES", onClick = { openHighScores() })
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // 3. Quit Button
+                        // Uses a hollow style to distinguish it slightly, or same style
+                        Button(
+                            onClick = { finish() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            border = BorderStroke(2.dp, ThemeRed),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.width(220.dp).height(60.dp)
+                        ) {
+                            Text(
+                                "QUIT",
+                                fontSize = 20.sp,
+                                color = ThemeRed,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun MenuButton(text: String, onClick: () -> Unit) {
+        Button(
+            onClick = onClick,
+            colors = ButtonDefaults.buttonColors(containerColor = ThemeRed), // Red platforms
+            shape = RoundedCornerShape(8.dp), // Slightly blocky like platforms
+            modifier = Modifier
+                .width(220.dp)
+                .height(60.dp)
+        ) {
+            Text(
+                text = text,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeWhite,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+
+    @Composable
+    fun HighScoresOverlay() {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ThemeBlack) // Full screen black background
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 1. Large Top Bar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ThemeRed) // Red header bar
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "HIGH SCORES",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ThemeWhite,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 4.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Scrollable Lazy Window
+                // weights (1f) ensure it takes up all available space between header and footer
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Dummy data for display purposes
+                    items(20) { index ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                                .background(Color(0xFF1A1A1A), RoundedCornerShape(4.dp)) // Dark gray item bg
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Player ${index + 1}",
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                text = "${(20 - index) * 100}", // Descending dummy scores
+                                color = ThemeRed,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 3. Close Button at the bottom
+                MenuButton(text = "CLOSE", onClick = { backToMenu() })
+
+                Spacer(modifier = Modifier.height(32.dp)) // Bottom padding
             }
         }
     }
@@ -189,13 +376,13 @@ class MainActivity : GameActivity() {
             Column(modifier = Modifier.align(Alignment.TopStart)) {
                 Text(
                     text = "Score:",
-                    color = Color.Black,
+                    color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "${currentScore.intValue}",
-                    color = Color.Black,
+                    color = Color.White,
                     fontSize = 24.sp,
                     fontFamily = FontFamily.Monospace
                 )
@@ -208,48 +395,45 @@ class MainActivity : GameActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xAA000000)) // Semi-transparent black
-                .clickable(enabled = false) {}, // Block clicks
+                .background(Color(0xEE000000)) // Mostly opaque black
+                .clickable(enabled = false) {},
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .background(Color.White, shape = RoundedCornerShape(16.dp))
-                    .padding(32.dp)
-            ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "GAME OVER",
-                    color = Color.Red,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "GAME OVER",
+                    fontSize = 48.sp,
+                    color = ThemeRed,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
+
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Final Score", color = Color.Black, fontSize = 18.sp)
+
+                Text("FINAL SCORE", color = Color.Gray, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
                 Text(
                     text = "${currentScore.intValue}",
-                    color = Color.Black,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold
+                    color = ThemeWhite,
+                    fontSize = 60.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
-                Spacer(modifier = Modifier.height(24.dp))
 
-                // Restart Button
-                Button(
-                    onClick = { startGame() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
-                ) {
-                    Text("Try Again")
-                }
+                Spacer(modifier = Modifier.height(40.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
+                MenuButton(text = "RETRY", onClick = { restartGame() })
 
-                // Back to Menu Button
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Hollow Style for "Menu"
                 Button(
                     onClick = { backToMenu() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    border = BorderStroke(2.dp, Color.Gray),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.width(220.dp).height(50.dp)
                 ) {
-                    Text("Main Menu")
+                    Text("MAIN MENU", fontSize = 18.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
                 }
             }
         }
