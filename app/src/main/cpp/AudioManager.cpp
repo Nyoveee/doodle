@@ -86,6 +86,8 @@ ResourceDescriptor AudioManager::descriptor(const char *path) {
 status AudioManager::playBGM(const char* path, bool loopBool) {
     SLresult result;
 
+    stopBGM();
+
     //get ResourceDescriptor based on path
     ResourceDescriptor descriptor = AudioManager::descriptor(path);
     if(descriptor.mDescriptor < 0){

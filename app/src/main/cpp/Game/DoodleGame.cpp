@@ -182,6 +182,7 @@ void DoodleGame::InitPlay() {
     score = 0;
     basePos = getPlayer().position;
     gameState = GameState::Playing;
+    engine.playAudio("BGM.mp3", true);
 }
 
 void DoodleGame::PlayTime(float deltaTime) {
@@ -263,6 +264,7 @@ void DoodleGame::PlayTime(float deltaTime) {
         isGameOver = true;
         JNI_GameOver(engine.app_, static_cast<int>(score));
         gameState = GameState::GameOver;
+        engine.playAudio("GameOverBGM.mp3", true);
     }
 }
 
@@ -303,6 +305,7 @@ void DoodleGame::ResetGame() {
     score = 0;
     basePos = getPlayer().position;
     gameState = GameState::Playing;
+    engine.playAudio("BGM.mp3", true);
 }
 
 

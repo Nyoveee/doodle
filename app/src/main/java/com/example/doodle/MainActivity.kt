@@ -215,8 +215,11 @@ class MainActivity : GameActivity() {
         startGameNative()
     }
 
+    external fun playMenuBGM()
+
     fun backToMenu() {
         currentScreen.value = ScreenState.START_MENU
+        playMenuBGM()
     }
 
 

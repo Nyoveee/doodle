@@ -121,7 +121,7 @@ void android_main(struct android_app *pApp) {
 
             static bool audioBool = false;
             if(!audioBool){
-                pEngine->playAudio("BGM.mp3", true);
+                pEngine->playAudio("menuBGM.mp3", true);
                 audioBool = true;
             }
 

@@ -92,3 +92,9 @@ Java_com_example_doodle_MainActivity_startGameNative(JNIEnv *env, jobject thiz) 
 }
 
 }
+
+void Java_com_example_doodle_MainActivity_playMenuBGM(JNIEnv *env, jobject thiz) {
+    if(g_Engine){
+        g_Engine->playAudio("menuBGM.mp3", true);
+    }
+}
