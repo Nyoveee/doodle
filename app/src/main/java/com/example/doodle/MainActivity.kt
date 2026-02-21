@@ -162,43 +162,26 @@ class MainActivity : GameActivity() {
             pendingScore.intValue = finalScore
 
             if (getSavedUsername() == null) {
-                // First time — ask for name before saving
                 showUsernameDialog.value = true
                 currentScreen.value = ScreenState.GAME_OVER
             } else {
-                // Already have a name — save score directly
                 currentScreen.value = ScreenState.GAME_OVER
                 persistScore(finalScore, getSavedUsername()!!)
             }
         }
     }
 
-    // Extracted so both paths can call it
-    private fun persistScore(finalScore: Int, username: String) {
-        val userId = getOrCreateUserId()
+    private fun persistScore(score: Int, username: String) {
         lifecycleScope.launch {
-            val now = System.currentTimeMillis()
-            val existing = dao.getPlayerScore(userId).firstOrNull()
-            if (existing == null) {
-                dao.upsert(HighScoreEntity(
-                    userId = userId,
+            dao.insert(
+                HighScoreEntity(
+                    userId = getOrCreateUserId(),
                     gameId = UUID.randomUUID().toString(),
                     username = username,
-                    highScore = finalScore,
-                    gamesPlayed = 1,
-                    achievedAt = now,
-                    lastPlayedAt = now
-                ))
-            } else {
-                val isNewRecord = finalScore > existing.highScore
-                dao.upsert(existing.copy(
-                    gameId = if (isNewRecord) UUID.randomUUID().toString() else existing.gameId,
-                    highScore = maxOf(existing.highScore, finalScore),
-                    gamesPlayed = existing.gamesPlayed + 1,
-                    achievedAt = if (isNewRecord) now else existing.achievedAt,
-                    lastPlayedAt = now
-                ))
-            }
+                    score = score,
+                    achievedAt = System.currentTimeMillis()
+                )
+            )
         }
     }
 
@@ -406,7 +389,7 @@ class MainActivity : GameActivity() {
                         }
                     }
 
-                    itemsIndexed(scores) { index, score ->
+                    itemsIndexed(scores) { index, entry ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -418,17 +401,24 @@ class MainActivity : GameActivity() {
                         ) {
                             Text("#${index + 1}", color = Color.Gray,
                                 fontFamily = FontFamily.Monospace, fontSize = 14.sp)
-                            Text(score.username, color = Color.White,
-                                fontFamily = FontFamily.Monospace, fontSize = 18.sp)
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("${score.highScore}", color = themeRed,
+                            Column {
+                                Text(entry.username, color = Color.White,
+                                    fontFamily = FontFamily.Monospace, fontSize = 18.sp)
+                                Text(
+                                    // Format timestamp as readable date
+                                    java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+                                        .format(java.util.Date(entry.achievedAt)),
+                                    color = Color.Gray,
                                     fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                Text("${score.gamesPlayed} games", color = Color.Gray,
-                                    fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                    fontSize = 11.sp
+                                )
                             }
+                            Text("${entry.score}", color = themeRed,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
                     }
+
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

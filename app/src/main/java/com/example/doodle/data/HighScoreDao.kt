@@ -9,14 +9,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HighScoreDao {
 
-    // Reactive top-20 leaderboard — reemits automatically on any change
-    @Query("SELECT * FROM high_scores ORDER BY highScore DESC LIMIT 20")
+    @Query("SELECT * FROM high_scores ORDER BY score DESC LIMIT 20")
     fun getTopScores(): Flow<List<HighScoreEntity>>
 
-    @Query("SELECT * FROM high_scores WHERE userId = :userId")
-    fun getPlayerScore(userId: String): Flow<HighScoreEntity?>
-
-    // REPLACE handles both insert and update atomically
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(score: HighScoreEntity)
+    @Insert
+    suspend fun insert(score: HighScoreEntity)
 }
