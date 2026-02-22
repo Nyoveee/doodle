@@ -14,9 +14,6 @@ void JNI_GameOver(android_app* app, int score);
 // UI to Engine (The JNI Export Declaration)
 extern "C" {
 JNIEXPORT void JNICALL
-Java_com_example_doodle_MainActivity_restartGameNative(JNIEnv *env, jobject thiz);
-
-JNIEXPORT void JNICALL
 Java_com_example_doodle_MainActivity_startGameNative(JNIEnv *env, jobject thiz);
 
 JNIEXPORT void JNICALL
