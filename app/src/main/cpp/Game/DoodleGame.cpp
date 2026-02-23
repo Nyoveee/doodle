@@ -26,6 +26,10 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
     engine.getTextureId("Player.png");
     engine.getTextureId("Scrolling Background.png");
     engine.getTextureId("Platform 1.png");
+    engine.getTextureId("Platform 2.png");
+    engine.getTextureId("Platform 3.png");
+    engine.getTextureId("Platform 4.png");
+    engine.getTextureId("Platform 5.png");
 }
 
 Player& DoodleGame::getPlayer() {
@@ -35,14 +39,14 @@ Player& DoodleGame::getPlayer() {
 
 void DoodleGame::update(float deltaTime) {
 // Because the renderer needs some time to get the correct width/height of the screen
-    if(initDelay > 0) {
-        initDelay -= deltaTime;
-        return;
-    }
+//    if(initDelay > 0) {
+//        initDelay -= deltaTime;
+//        return;
+//    }
 
     switch (gameState) {
         case GameState::Start:
-            InitPlay();
+            //InitPlay();
             break;
         case GameState::Playing:
             PlayTime(deltaTime);
@@ -117,7 +121,17 @@ void DoodleGame::updateUI(float deltaTime) {
 
 
 void DoodleGame::StartGame() {
-    gameState = GameState::Start;
+    //gameState = GameState::Start;
+
+    if(!hasGameRunOnce)
+    {
+        InitPlay();
+    } else
+    {
+        ResetGame();
+    }
+
+
 }
 
 
@@ -237,6 +251,42 @@ void DoodleGame::PlayTime(float deltaTime) {
     }
 }
 void DoodleGame::ResetGame() {
-    gameState = GameState::Start;
+    //gameState = GameState::Start;
+    //gameObjects.clear();
+    nextPlatformSpawn = 400;
+    //camera reset
+    glm::vec2 currentScale = camera.scale;
+    camera = Camera(); // Reset camera position and scale
+    camera.scale = currentScale;
+
+    //despawn all plaforms except the starting one
+    auto iter = std::remove_if(gameObjects.begin(), gameObjects.end(),
+                               [](const std::unique_ptr<GameObject>& go) {
+                                   return go->getType() == GameObjectType::Platform;
+                               });
+    gameObjects.erase(iter, gameObjects.end());
+
+    //reset player position and velocity
+    Player &player{getPlayer()};
+    player.position =  glm::vec2{0,-camera.scale.y/2.f};
+    getPlayer().prevPos = getPlayer().position;
+    player.velocity = glm::vec2{0,0};
+    player.rotation = 0;
+    PlayerJump();
+
+
+    //large platform
+    gameObjects[backgroundIndex]->position = glm::vec2{0,0};
+
+    // Starting Platform
+    SpawnPlatform(0, -camera.scale.y/2.f);
+    (gameObjects.end()-1)->get()->scale.x = camera.scale.x;
+    nextPlatformSpawn += gameObjects[playerIndex]->position.y;
+
+    isGameOver = false;
+    //UI init
+    score = 0;
+    basePos = getPlayer().position;
+    gameState = GameState::Playing;
 }
 
