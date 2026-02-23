@@ -16,7 +16,6 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         engine { engine },
         camera { camera },
         gravity{2000},
-        initDelay{1.f},
         nextPlatformSpawn{400}, // Start with some offset
         distanceBetweenPlatforms{150},
         hasGameRunOnce{false},
@@ -37,11 +36,6 @@ Player& DoodleGame::getPlayer() {
 void DoodleGame::update(float deltaTime) {
     switch (gameState) {
         case GameState::Start:
-            // Because the renderer needs some time to get the correct width/height of the screen
-            if(initDelay > 0) {
-                initDelay -= deltaTime;
-                return;
-            }
             InitPlay();
             break;
         case GameState::Playing:
