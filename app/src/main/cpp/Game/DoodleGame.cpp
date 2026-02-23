@@ -21,11 +21,12 @@ DoodleGame::DoodleGame(Engine& engine, Camera& camera) :
         distanceBetweenPlatforms{150},
         hasGameRunOnce{false},
         isGameOver{false},
-        gameState{GameState::Start}
+        gameState{GameState::Awake}
 {
     engine.getTextureId("Player.png");
     engine.getTextureId("Scrolling Background.png");
     engine.getTextureId("Platform 1.png");
+
 }
 
 Player& DoodleGame::getPlayer() {
@@ -34,20 +35,19 @@ Player& DoodleGame::getPlayer() {
 }
 
 void DoodleGame::update(float deltaTime) {
-// Because the renderer needs some time to get the correct width/height of the screen
-    if(initDelay > 0) {
-        initDelay -= deltaTime;
-        return;
-    }
-
     switch (gameState) {
         case GameState::Start:
+            // Because the renderer needs some time to get the correct width/height of the screen
+            if(initDelay > 0) {
+                initDelay -= deltaTime;
+                return;
+            }
             InitPlay();
             break;
         case GameState::Playing:
             PlayTime(deltaTime);
             break;
-        case GameState::GameOver:
+        default:
             break;
     }
 }

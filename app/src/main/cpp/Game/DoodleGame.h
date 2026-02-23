@@ -42,6 +42,7 @@ public:
 
 public:
     enum class GameState{
+        Awake,
         Start,
         Playing,
         GameOver
